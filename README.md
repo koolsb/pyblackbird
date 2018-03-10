@@ -7,7 +7,7 @@ Python3 interface implementation for Monoprice Blackbird 4k 8x8 HDBaseT Matrix
 This is for use with [Home-Assistant](http://home-assistant.io)
 
 ## Usage
-'''python
+```python
 from pyblackbird import get_blackbird
 
 blackbird = get_blackbird('/dev/ttyUSB0')
@@ -29,3 +29,4 @@ blackbird.set_power(1, False)
 
 # Set source 5 for zone #1
 blackbird.set_source(1, 5)
+```
