@@ -3,11 +3,19 @@ from pyblackbird import get_blackbird
 blackbird = get_blackbird('/home/localadmin/dev/ttyV0')
 # Valid zones are 11-16 for main monoprice amplifier
 zone_status = blackbird.zone_status(1)
+system_power_status = blackbird.system_power_status()
+#blackbird.set_system_power(4)
+#blackbird.set_source(2,2)
+#blackbird.set_zone_power(1,1)
+
+# Print system power status
+print('System Power = {}'.format(system_power_status))
 
 # Print zone status
 print('Zone Number = {}'.format(zone_status.zone))
 print('AV Source = {}'.format(zone_status.av))
-#print('Power is {}'.format('On' if zone_status.power else 'Off'))
+print('IR Source = {}'.format(zone_status.ir))
+print('Zone Power is {}'.format('On' if zone_status.power else 'Off'))
 #print('Mute is {}'.format('On' if zone_status.mute else 'Off'))
 #print('Public Anouncement Mode is {}'.format('On' if zone_status.pa else 'Off'))
 #print('Do Not Disturb Mode is {}'.format('On' if zone_status.do_not_disturb else 'Off'))
