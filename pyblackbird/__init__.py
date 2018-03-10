@@ -12,7 +12,7 @@ ZONE_PATTERN_ON = re.compile('\D\D\D\s(\d\d)\D\D(\d\d)\s\s\D\D\D\s(\d\d)\D\D\d\d
 ZONE_PATTERN_OFF = re.compile('\D\D\DOFF\D\D(\d\d)\s\s\D\D\D\D\D\D\D\D\d\d\s')
 EOL = b'\r'
 LEN_EOL = len(EOL)
-TIMEOUT = 5 # Number of seconds before serial operation timeout
+TIMEOUT = 2 # Number of seconds before serial operation timeout
 
 class ZoneStatus(object):
 	def __init__(self,
@@ -90,24 +90,24 @@ def _format_zone_status_request(zone: int) -> bytes:
 	return 'Status{}.\r'.format(zone).encode()
 
 def _format_system_power_status_request() -> bytes:
-	return '%9962.'.encode()
+	return '%9962.\r'.encode()
 
 def _format_set_system_power(power: int) -> bytes:
 	if power == 1:
-		return 'PWON.'.encode()
+		return 'PWON.\r'.encode()
 	elif power == 0:
-		return 'PWOFF.'.encode()
-	elif power == 3:
-		return 'STANDBY.'.encode()
+		return 'PWOFF.\r'.encode()
+	elif power == 2:
+		return 'STANDBY.\r'.encode()
 	else:
 		return None
 
 def _format_set_zone_power(zone: int, power: bool) -> bytes:
-	return '{}{}.'.format(zone, '@' if power else '$').encode()
+	return '{}{}.\r'.format(zone, '@' if power else '$').encode()
 
 def _format_set_source(zone: int, source: int) -> bytes:
 	source = int(max(1, min(source,8)))
-	return '{}B{}.'.format(source, zone).encode()
+	return '{}B{}.\r'.format(source, zone).encode()
 
 
 
@@ -153,7 +153,6 @@ def get_blackbird(port_url):
 			# receive
 			result = bytearray()
 			while True:
-				# FIGURE OUT HOW TO READ MORE THAN ONE LINE HERE
 				c = self._port.read(1)
 				if c is None:
 					break
@@ -218,7 +217,7 @@ def get_async_blackbird(port_url, loop):
 
 	class BlackbirdAsync(Blackbird):
 		def __init__(self, blackbird_protocol):
-			self._protocol = monoprice_protocol
+			self._protocol = blackbird_protocol
 
 		@locked_coro
 		@asyncio.coroutine

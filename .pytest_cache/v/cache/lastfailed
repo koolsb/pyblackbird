@@ -1,0 +1,9 @@
+{
+  "tests/test_blackbird.py::TestAsyncBlackbird::test_set_source": true,
+  "tests/test_blackbird.py::TestAsyncBlackbird::test_set_zone_power": true,
+  "tests/test_blackbird.py::TestAsyncBlackbird::test_timeout": true,
+  "tests/test_blackbird.py::TestAsyncBlackbird::test_zone_status": true,
+  "tests/test_blackbird.py::TestBlackbird::test_set_source": true,
+  "tests/test_blackbird.py::TestBlackbird::test_set_system_power": true,
+  "tests/test_blackbird.py::TestBlackbird::test_set_zone_power": true
+}
