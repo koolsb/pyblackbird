@@ -1,5 +1,5 @@
 ## Status
-
+[![Build Status](https://travis-ci.org/koolsb/pyblackbird.svg?branch=master)](https://travis-ci.org/koolsb/pyblackbird)
 # pyblackbird
 Python3 interface implementation for Monoprice Blackbird 4k 8x8 HDBaseT Matrix
 
