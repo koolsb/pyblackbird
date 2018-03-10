@@ -12,7 +12,7 @@ ZONE_PATTERN_ON = re.compile('\D\D\D\s(\d\d)\D\D(\d\d)\s\s\D\D\D\s(\d\d)\D\D\d\d
 ZONE_PATTERN_OFF = re.compile('\D\D\DOFF\D\D(\d\d)\s\s\D\D\D\D\D\D\D\D\d\d\s')
 EOL = b'\r'
 LEN_EOL = len(EOL)
-TIMEOUT = 2 # Number of seconds before serial operation timeout
+TIMEOUT = 5 # Number of seconds before serial operation timeout
 
 class ZoneStatus(object):
 	def __init__(self,
@@ -100,7 +100,7 @@ def _format_set_system_power(power: int) -> bytes:
 	elif power == 2:
 		return 'STANDBY.\r'.encode()
 	else:
-		return None
+		return '\r'.encode()
 
 def _format_set_zone_power(zone: int, power: bool) -> bytes:
 	return '{}{}.\r'.format(zone, '@' if power else '$').encode()
@@ -230,8 +230,9 @@ def get_async_blackbird(port_url, loop):
 		@locked_coro
 		@asyncio.coroutine
 		def zone_status(self, zone: int):
-			# 
-			string = yield from self._protocol.send(_format_zone_status_request(zone), skip=20)
+			# First check if system power is on
+			#if "ON" in self.system_power_status():
+			string = yield from self._protocol.send(_format_zone_status_request(zone), skip=15)
 			return ZoneStatus.from_string(string)
 
 		@locked_coro
@@ -247,7 +248,7 @@ def get_async_blackbird(port_url, loop):
 		@locked_coro
 		@asyncio.coroutine
 		def set_source(self, zone: int, source: int):
-			yield from self._protocol.send(_formst_set_source(zone, source))
+			yield from self._protocol.send(_format_set_source(zone, source))
 
 	class BlackbirdProtocol(asyncio.Protocol):
 		def __init__(self, loop):
