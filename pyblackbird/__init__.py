@@ -13,6 +13,7 @@ ZONE_PATTERN_OFF = re.compile('\D\D\DOFF\D\D(\d\d)\s\s\D\D\D\D\D\D\D\D\d\d\s')
 EOL = b'\r'
 LEN_EOL = len(EOL)
 TIMEOUT = 5 # Number of seconds before serial operation timeout
+SYSTEM_POWER = True
 
 class ZoneStatus(object):
 	def __init__(self,
@@ -94,10 +95,13 @@ def _format_system_power_status_request() -> bytes:
 
 def _format_set_system_power(power: int) -> bytes:
 	if power == 1:
+		SYSTEM_POWER = True
 		return 'PWON.\r'.encode()
 	elif power == 0:
+		SYSTEM_POWER = False
 		return 'PWOFF.\r'.encode()
 	elif power == 2:
+		SYSTEM_POWER = False
 		return 'STANDBY.\r'.encode()
 	else:
 		return '\r'.encode()
@@ -176,7 +180,7 @@ def get_blackbird(port_url):
 		@synchronized
 		def zone_status(self, zone: int):
 			# First check if system power is on
-			if "ON" in self.system_power_status():
+			if SYSTEM_POWER:
 				return ZoneStatus.from_string(self._process_request(_format_zone_status_request(zone), skip=20))
 			else:
 				return ZoneStatus.power_off(zone)
@@ -231,9 +235,11 @@ def get_async_blackbird(port_url, loop):
 		@asyncio.coroutine
 		def zone_status(self, zone: int):
 			# First check if system power is on
-			#if "ON" in self.system_power_status():
-			string = yield from self._protocol.send(_format_zone_status_request(zone), skip=15)
-			return ZoneStatus.from_string(string)
+			if SYSTEM_POWER:
+				string = yield from self._protocol.send(_format_zone_status_request(zone), skip=15)
+				return ZoneStatus.from_string(string)
+			else:
+				return ZoneStatus.power_off(zone)
 
 		@locked_coro
 		@asyncio.coroutine
