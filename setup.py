@@ -7,7 +7,7 @@ VERSION = '0.1'
 
 try:
     from setuptools import setup
-excpt ImportError:
+except ImportError:
     from distutils.core import setup
 
 
