@@ -35,12 +35,12 @@ class ZoneStatus(object):
 			match_off = re.search (ZONE_PATTERN_OFF, string)
 			if not match_off:
 				return None
-			return ZoneStatus(0,0,*[int(m) for m in match_off.groups()],0)
+			return ZoneStatus(None,None,*[int(m) for m in match_off.groups()],None)
 		return ZoneStatus(1,*[int(m) for m in match_on.groups()])
 
 	@classmethod
 	def power_off(cls, zone: int):
-		return ZoneStatus(0,zone,0)
+		return ZoneStatus(None,zone,None, None)
 
 class Blackbird(object):
 	"""
