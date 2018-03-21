@@ -12,8 +12,8 @@ from pyblackbird import get_blackbird
 
 blackbird = get_blackbird('/dev/ttyUSB0')
 
-# Print system power status
-print('System Power is {}'.format(system_power_status))
+# Print system lock status
+print('System Lock is {}'.format('On' if blackbird.lock_status() else 'Off'))
 
 # Valid zones are 1-8
 zone_status = blackbird.zone_status(1)
@@ -28,5 +28,15 @@ print('IR Source = {}'.format(zone_status.ir))
 blackbird.set_power(1, False)
 
 # Set source 5 for zone #1
-blackbird.set_source(1, 5)
+blackbird.set_zone_source(1, 5)
+
+# Set all zones to source 2
+blackbird.set_all_zone_source(2)
+
+# Lock system buttons
+blackbird.lock_front_buttons()
+
+# Unlock system buttons
+blackbird.unlock_front_buttons()
+
 ```
