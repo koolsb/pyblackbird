@@ -3,7 +3,7 @@ import unittest
 import serial
 
 from pyblackbird import (get_blackbird, get_async_blackbird, ZoneStatus)
-from tests import create_dummy_port
+from tests import (create_dummy_port, create_dummy_socket)
 import asyncio
 
 

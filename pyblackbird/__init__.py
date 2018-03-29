@@ -14,7 +14,6 @@ ZONE_PATTERN_OFF = re.compile('\D\D\DOFF\D\D\d\d\s\s\D\D\D\D\D\D\D\D\d\d\s')
 EOL = b'\r'
 LEN_EOL = len(EOL)
 TIMEOUT = 2 # Number of seconds before serial operation timeout
-SYSTEM_POWER = None
 PORT = 4001
 SOCKET_RECV = 2048
 
@@ -138,13 +137,14 @@ def _format_lock_status() -> bytes:
     return '%9961.\r'.encode()
 
 
-def get_blackbird(host):
+def get_blackbird(url, use_serial=True):
     """
     Return synchronous version of Blackbird interface
     :param port_url: serial port, i.e. '/dev/ttyUSB0'
     :return: synchronous implementation of Blackbird interface
     """
     lock = RLock()
+    print(serial)
 
     def synchronized(func):
         @wraps(func)
@@ -154,18 +154,29 @@ def get_blackbird(host):
         return wrapper
 
     class BlackbirdSync(Blackbird):
-        def __init__(self, host):
+        def __init__(self, url):
             """
-            Initialize the socket client.
+            Initialize the client.
             """
-            self.host = host
-            self.port = PORT
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.settimeout(TIMEOUT)
-            self.socket.connect((self.host, self.port))
+            if use_serial:
+                self._port = serial.serial_for_url(url, do_not_open=True)
+                self._port.baudrate = 9600
+                self._port.stopbits = serial.STOPBITS_ONE
+                self._port.bytesize = serial.EIGHTBITS
+                self._port.parity = serial.PARITY_NONE
+                self._port.timeout = TIMEOUT
+                self._port.write_timeout = TIMEOUT
+                self._port.open()
 
-            # Clear login message
-            self.socket.recv(SOCKET_RECV)
+            else:
+                self.host = url
+                self.port = PORT
+                self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.socket.settimeout(TIMEOUT)
+                self.socket.connect((self.host, self.port))
+
+                # Clear login message
+                self.socket.recv(SOCKET_RECV)
 
         def _process_request(self, request: bytes, skip=0):
             """
@@ -176,19 +187,43 @@ def get_blackbird(host):
             """
             _LOGGER.debug('Sending "%s"', request)
 
-            self.socket.send(request)
+            if use_serial:
+                # clear
+                self._port.reset_output_buffer()
+                self._port.reset_input_buffer()
+                # send
+                self._port.write(request)
+                self._port.flush()
+                # receive
+                result = bytearray()
+                while True:
+                    c = self._port.read(1)
+                    if c is None:
+                        break
+                    if not c:
+                        raise serial.SerialTimeoutException(
+                            'Connection timed out! Last received bytes {}'.format([hex(a) for a in result]))
+                    result += c
+                    if len(result) > skip and result [-LEN_EOL:] == EOL:
+                        break
+                ret = bytes(result)
+                _LOGGER.debug('Received "%s"', ret)
+                return ret.decode('ascii')
 
-            response = ""
+            else:
+                self.socket.send(request)
 
-            while True:
+                response = ''
 
-                data = self.socket.recv(SOCKET_RECV)
-                response += data.decode('ascii')
-                
-                if EOL in data and len(response) > skip:
-                    break
+                while True:
 
-            return response
+                    data = self.socket.recv(SOCKET_RECV)
+                    response += data.decode('ascii')
+                    
+                    if EOL in data and len(response) > skip:
+                        break
+
+                return response
 
         @synchronized
         def zone_status(self, zone: int):
@@ -225,7 +260,7 @@ def get_blackbird(host):
             # Report system locking status
             return LockStatus.from_string(self._process_request(_format_lock_status()))
 
-    return BlackbirdSync(host)
+    return BlackbirdSync(url)
 
 
 @asyncio.coroutine
