@@ -10,7 +10,11 @@ This is for use with [Home-Assistant](http://home-assistant.io)
 ```python
 from pyblackbird import get_blackbird
 
+# Connect via serial port
 blackbird = get_blackbird('/dev/ttyUSB0')
+
+# Connect via IP
+blackbird = get_blackbird('192.168.1.50', use_serial=False)
 
 # Print system lock status
 print('System Lock is {}'.format('On' if blackbird.lock_status() else 'Off'))

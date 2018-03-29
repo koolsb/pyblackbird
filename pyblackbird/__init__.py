@@ -3,6 +3,7 @@ import functools
 import logging
 import re
 import serial
+import socket
 from functools import wraps
 from serial_asyncio import create_serial_connection
 from threading import RLock
@@ -13,7 +14,8 @@ ZONE_PATTERN_OFF = re.compile('\D\D\DOFF\D\D\d\d\s\s\D\D\D\D\D\D\D\D\d\d\s')
 EOL = b'\r'
 LEN_EOL = len(EOL)
 TIMEOUT = 2 # Number of seconds before serial operation timeout
-SYSTEM_POWER = None
+PORT = 4001
+SOCKET_RECV = 2048
 
 class ZoneStatus(object):
     def __init__(self,
@@ -52,6 +54,7 @@ class LockStatus(object):
             return True
         else:
             return False
+
 
 class Blackbird(object):
     """
@@ -134,13 +137,14 @@ def _format_lock_status() -> bytes:
     return '%9961.\r'.encode()
 
 
-def get_blackbird(port_url):
+def get_blackbird(url, use_serial=True):
     """
     Return synchronous version of Blackbird interface
     :param port_url: serial port, i.e. '/dev/ttyUSB0'
     :return: synchronous implementation of Blackbird interface
     """
     lock = RLock()
+    print(serial)
 
     def synchronized(func):
         @wraps(func)
@@ -150,44 +154,76 @@ def get_blackbird(port_url):
         return wrapper
 
     class BlackbirdSync(Blackbird):
-        def __init__(self, port_url):
-            self._port = serial.serial_for_url(port_url, do_not_open=True)
-            self._port.baudrate = 9600
-            self._port.stopbits = serial.STOPBITS_ONE
-            self._port.bytesize = serial.EIGHTBITS
-            self._port.parity = serial.PARITY_NONE
-            self._port.timeout = TIMEOUT
-            self._port.write_timeout = TIMEOUT
-            self._port.open()
+        def __init__(self, url):
+            """
+            Initialize the client.
+            """
+            if use_serial:
+                self._port = serial.serial_for_url(url, do_not_open=True)
+                self._port.baudrate = 9600
+                self._port.stopbits = serial.STOPBITS_ONE
+                self._port.bytesize = serial.EIGHTBITS
+                self._port.parity = serial.PARITY_NONE
+                self._port.timeout = TIMEOUT
+                self._port.write_timeout = TIMEOUT
+                self._port.open()
+
+            else:
+                self.host = url
+                self.port = PORT
+                self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.socket.settimeout(TIMEOUT)
+                self.socket.connect((self.host, self.port))
+
+                # Clear login message
+                self.socket.recv(SOCKET_RECV)
 
         def _process_request(self, request: bytes, skip=0):
             """
+            Send data to socket
             :param request: request that is sent to the blackbird
             :param skip: number of bytes to skip for end of transmission decoding
             :return: ascii string returned by blackbird
             """
             _LOGGER.debug('Sending "%s"', request)
-            # clear
-            self._port.reset_output_buffer()
-            self._port.reset_input_buffer()
-            # send
-            self._port.write(request)
-            self._port.flush()
-            # receive
-            result = bytearray()
-            while True:
-                c = self._port.read(1)
-                if c is None:
-                    break
-                if not c:
-                    raise serial.SerialTimeoutException(
-                        'Connection timed out! Last received bytes {}'.format([hex(a) for a in result]))
-                result += c
-                if len(result) > skip and result [-LEN_EOL:] == EOL:
-                    break
-            ret = bytes(result)
-            _LOGGER.debug('Received "%s"', ret)
-            return ret.decode('ascii')
+
+            if use_serial:
+                # clear
+                self._port.reset_output_buffer()
+                self._port.reset_input_buffer()
+                # send
+                self._port.write(request)
+                self._port.flush()
+                # receive
+                result = bytearray()
+                while True:
+                    c = self._port.read(1)
+                    if c is None:
+                        break
+                    if not c:
+                        raise serial.SerialTimeoutException(
+                            'Connection timed out! Last received bytes {}'.format([hex(a) for a in result]))
+                    result += c
+                    if len(result) > skip and result [-LEN_EOL:] == EOL:
+                        break
+                ret = bytes(result)
+                _LOGGER.debug('Received "%s"', ret)
+                return ret.decode('ascii')
+
+            else:
+                self.socket.send(request)
+
+                response = ''
+
+                while True:
+
+                    data = self.socket.recv(SOCKET_RECV)
+                    response += data.decode('ascii')
+                    
+                    if EOL in data and len(response) > skip:
+                        break
+
+                return response
 
         @synchronized
         def zone_status(self, zone: int):
@@ -224,7 +260,7 @@ def get_blackbird(port_url):
             # Report system locking status
             return LockStatus.from_string(self._process_request(_format_lock_status()))
 
-    return BlackbirdSync(port_url)
+    return BlackbirdSync(url)
 
 
 @asyncio.coroutine
