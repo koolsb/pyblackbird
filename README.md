@@ -5,7 +5,7 @@ Python3 interface implementation for Monoprice Blackbird HDMI Matrix Switches
 
 ## Notes
 This is for use with [Home-Assistant](http://home-assistant.io)
-Has been tested with models 21819 and 24180
+Has been tested with models [21819](https://www.monoprice.com/product?p_id=21819) and [24180](https://www.monoprice.com/product?p_id=24180)
 
 ## Usage
 ```python
