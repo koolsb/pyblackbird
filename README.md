@@ -1,10 +1,11 @@
 ## Status
 [![Build Status](https://travis-ci.org/koolsb/pyblackbird.svg?branch=master)](https://travis-ci.org/koolsb/pyblackbird)[![Coverage Status](https://coveralls.io/repos/github/koolsb/pyblackbird/badge.svg)](https://coveralls.io/github/koolsb/pyblackbird)
 # pyblackbird
-Python3 interface implementation for Monoprice Blackbird 4k 8x8 HDBaseT Matrix
+Python3 interface implementation for Monoprice Blackbird HDMI Matrix Switches
 
 ## Notes
 This is for use with [Home-Assistant](http://home-assistant.io)
+Has been tested with models 21819 and 24180
 
 ## Usage
 ```python
@@ -13,8 +14,14 @@ from pyblackbird import get_blackbird
 # Connect via serial port
 blackbird = get_blackbird('/dev/ttyUSB0')
 
+# Connect via serial port with a device that doesn't support IR control
+blackbird = get_blackbird('/dev/ttyUSB0', use_serial=True, ir_control=false)
+
 # Connect via IP
 blackbird = get_blackbird('192.168.1.50', use_serial=False)
+
+# Connect via IP with a device that doesn't support IR control
+blackbird = get_blackbird('192.168.1.50', use_serial=False, ir_control=false)
 
 # Print system lock status
 print('System Lock is {}'.format('On' if blackbird.lock_status() else 'Off'))
