@@ -263,8 +263,7 @@ def get_blackbird(url, use_serial=True):
     return BlackbirdSync(url)
 
 
-@asyncio.coroutine
-def get_async_blackbird(port_url, loop):
+async def get_async_blackbird(port_url, loop):
     """
     Return asynchronous version of Blackbird interface
     :param port_url: serial port, i.e. '/dev/ttyUSB0'
@@ -274,11 +273,10 @@ def get_async_blackbird(port_url, loop):
     lock = asyncio.Lock()
 
     def locked_coro(coro):
-        @asyncio.coroutine
         @wraps(coro)
-        def wrapper(*args, **kwargs):
-            with (yield from lock):
-                return (yield from coro(*args, **kwargs))
+        async def wrapper(*args, **kwargs):
+            with (await lock):
+                return (await coro(*args, **kwargs))
         return wrapper
 
     class BlackbirdAsync(Blackbird):
@@ -286,40 +284,33 @@ def get_async_blackbird(port_url, loop):
             self._protocol = blackbird_protocol
 
         @locked_coro
-        @asyncio.coroutine
-        def zone_status(self, zone: int):
-            string = yield from self._protocol.send(_format_zone_status_request(zone), skip=15)
+        async def zone_status(self, zone: int):
+            string = await self._protocol.send(_format_zone_status_request(zone), skip=15)
             return ZoneStatus.from_string(zone, string)
 
         @locked_coro
-        @asyncio.coroutine
-        def set_zone_power(self, zone: int, power: bool):
-            yield from self._protocol.send(_format_set_zone_power(zone, power))
+        async def set_zone_power(self, zone: int, power: bool):
+            await self._protocol.send(_format_set_zone_power(zone, power))
 
         @locked_coro
-        @asyncio.coroutine
-        def set_zone_source(self, zone: int, source: int):
-            yield from self._protocol.send(_format_set_zone_source(zone, source))
+        async def set_zone_source(self, zone: int, source: int):
+            await self._protocol.send(_format_set_zone_source(zone, source))
 
         @locked_coro
-        @asyncio.coroutine
-        def set_all_zone_source(self, source: int):
-            yield from self._protocol.send(_format_set_all_zone_source(source))
+        async def set_all_zone_source(self, source: int):
+             await self._protocol.send(_format_set_all_zone_source(source))
 
         @locked_coro
-        @asyncio.coroutine
-        def lock_front_buttons(self):
-            yield from self._protocol.send(_format_lock_front_buttons())
+        async def lock_front_buttons(self):
+            await self._protocol.send(_format_lock_front_buttons())
 
         @locked_coro
-        @asyncio.coroutine
-        def unlock_front_buttons(self):
-            yield from self._protocol.send(_format_unlock_front_buttons())
+        async def unlock_front_buttons(self):
+            await self._protocol.send(_format_unlock_front_buttons())
 
         @locked_coro
-        @asyncio.coroutine
-        def lock_status(self):
-            string = yield from self._protocol.send(_format_lock_status())
+        async def lock_status(self):
+            string = await self._protocol.send(_format_lock_status())
             return LockStatus.from_string(string)
 
     class BlackbirdProtocol(asyncio.Protocol):
@@ -339,12 +330,11 @@ def get_async_blackbird(port_url, loop):
         def data_received(self, data):
             asyncio.ensure_future(self.q.put(data), loop=self._loop)
 
-        @asyncio.coroutine
-        def send(self, request: bytes, skip=0):
-            yield from self._connected.wait()
+        async def send(self, request: bytes, skip=0):
+            await self._connected.wait()
             result = bytearray()
             # Only one transaction at a time
-            with (yield from self._lock):
+            with (await self._lock):
                 self._transport.serial.reset_output_buffer()
                 self._transport.serial.reset_input_buffer()
                 while not self.q.empty():
@@ -352,7 +342,7 @@ def get_async_blackbird(port_url, loop):
                 self._transport.write(request)
                 try:
                     while True:
-                        result += yield from asyncio.wait_for(self.q.get(), TIMEOUT, loop=self._loop)
+                        result += await asyncio.wait_for(self.q.get(), TIMEOUT, loop=self._loop)
                         if len(result) > skip and result[-LEN_EOL:] == EOL:
                             ret = bytes(result)
                             _LOGGER.debug('Received "%s"', ret)
@@ -361,6 +351,6 @@ def get_async_blackbird(port_url, loop):
                     _LOGGER.error("Timeout during receiving response for command '%s', received='%s'", request, result)
                     raise
 
-    _, protocol = yield from create_serial_connection(loop, functools.partial(BlackbirdProtocol, loop), port_url, baudrate=9600)
+    _, protocol = await create_serial_connection(loop, functools.partial(BlackbirdProtocol, loop), port_url, baudrate=9600)
 
     return BlackbirdAsync(protocol)
