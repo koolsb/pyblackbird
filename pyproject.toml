@@ -1,0 +1,17 @@
+[project]
+name = "pyblackbird"
+version = "0.6"
+authors = [
+  { name = "Ben Kools", email="koolsb@my.uwstout.edu" },
+]
+description = "Python API for talking to Monoprice Blackbird 4k 8x8 HDBaseT Matrix"
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/koolsb/pyblackbird"
+"Bug Tracker" = "https://github.com/koolsb/pyblackbird/issues"
