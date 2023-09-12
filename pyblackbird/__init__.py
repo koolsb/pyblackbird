@@ -9,8 +9,8 @@ from serial_asyncio import create_serial_connection
 from threading import RLock
 
 _LOGGER = logging.getLogger(__name__)
-ZONE_PATTERN_ON = re.compile('\D\D\D\s(\d\d)\D\D\d\d\s\s\D\D\D\s(\d\d)\D\D\d\d\s')
-ZONE_PATTERN_OFF = re.compile('\D\D\DOFF\D\D\d\d\s\s\D\D\D\D\D\D\D\D\d\d\s')
+ZONE_PATTERN_ON = re.compile(r'\D\D\D\s(\d\d)\D\D\d\d\s\s\D\D\D\s(\d\d)\D\D\d\d\s')
+ZONE_PATTERN_OFF = re.compile(r'\D\D\DOFF\D\D\d\d\s\s\D\D\D\D\D\D\D\D\d\d\s')
 EOL = b'\r'
 LEN_EOL = len(EOL)
 TIMEOUT = 2 # Number of seconds before serial operation timeout
