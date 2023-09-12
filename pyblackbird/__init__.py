@@ -275,7 +275,7 @@ async def get_async_blackbird(port_url, loop):
     def locked_coro(coro):
         @wraps(coro)
         async def wrapper(*args, **kwargs):
-            with (await lock):
+            async with lock:
                 return (await coro(*args, **kwargs))
         return wrapper
 
@@ -314,13 +314,12 @@ async def get_async_blackbird(port_url, loop):
             return LockStatus.from_string(string)
 
     class BlackbirdProtocol(asyncio.Protocol):
-        def __init__(self, loop):
+        def __init__(self):
             super().__init__()
-            self._loop = loop
             self._lock = asyncio.Lock()
             self._transport = None
-            self._connected = asyncio.Event(loop=loop)
-            self.q = asyncio.Queue(loop=loop)
+            self._connected = asyncio.Event()
+            self.q = asyncio.Queue()
 
         def connection_made(self, transport):
             self._transport = transport
@@ -328,13 +327,13 @@ async def get_async_blackbird(port_url, loop):
             _LOGGER.debug('port opened %s', self._transport)
 
         def data_received(self, data):
-            asyncio.ensure_future(self.q.put(data), loop=self._loop)
+            asyncio.ensure_future(self.q.put(data))
 
         async def send(self, request: bytes, skip=0):
             await self._connected.wait()
             result = bytearray()
             # Only one transaction at a time
-            with (await self._lock):
+            async with self._lock:
                 self._transport.serial.reset_output_buffer()
                 self._transport.serial.reset_input_buffer()
                 while not self.q.empty():
@@ -342,7 +341,7 @@ async def get_async_blackbird(port_url, loop):
                 self._transport.write(request)
                 try:
                     while True:
-                        result += await asyncio.wait_for(self.q.get(), TIMEOUT, loop=self._loop)
+                        result += await asyncio.wait_for(self.q.get(), TIMEOUT)
                         if len(result) > skip and result[-LEN_EOL:] == EOL:
                             ret = bytes(result)
                             _LOGGER.debug('Received "%s"', ret)
@@ -351,6 +350,6 @@ async def get_async_blackbird(port_url, loop):
                     _LOGGER.error("Timeout during receiving response for command '%s', received='%s'", request, result)
                     raise
 
-    _, protocol = await create_serial_connection(loop, functools.partial(BlackbirdProtocol, loop), port_url, baudrate=9600)
+    _, protocol = await create_serial_connection(loop, BlackbirdProtocol, port_url, baudrate=9600)
 
     return BlackbirdAsync(protocol)
