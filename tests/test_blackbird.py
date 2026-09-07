@@ -1,6 +1,7 @@
 import unittest
 
 import serial
+import socket
 
 from pyblackbird import (get_blackbird, get_async_blackbird, ZoneStatus)
 from tests import (create_dummy_port, create_dummy_socket)
@@ -98,7 +99,8 @@ class TestBlackbirdSocket(TestBlackbird):
         )
 
     def test_timeout(self):
-        with self.assertRaises(TimeoutError):
+        # socket.timeout only became an alias of TimeoutError in 3.10.
+        with self.assertRaises(socket.timeout):
             self.blackbird.set_zone_source(6, 6)
 
 
