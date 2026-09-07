@@ -11,11 +11,22 @@ from threading import RLock
 _LOGGER = logging.getLogger(__name__)
 ZONE_PATTERN_ON = re.compile(r'\D\D\D\s(\d\d)\D\D\d\d\s\s\D\D\D\s(\d\d)\D\D\d\d\s')
 ZONE_PATTERN_OFF = re.compile(r'\D\D\DOFF\D\D\d\d\s\s\D\D\D\D\D\D\D\D\d\d\s')
+# Models without IR routing (e.g. 24180) report only the AV line. With no
+# second half to match against, these anchor on the literal "AV" prefix so a
+# malformed single-line response is still rejected, and accept either \r or
+# \r\n as the terminator.
+ZONE_PATTERN_ON_NO_IR = re.compile(r'AV\D\s(\d\d)\D\D\d\d\s')
+ZONE_PATTERN_OFF_NO_IR = re.compile(r'AV\DOFF\D\D\d\d\s')
 EOL = b'\r'
 LEN_EOL = len(EOL)
 TIMEOUT = 2 # Number of seconds before serial operation timeout
 PORT = 4001
 SOCKET_RECV = 2048
+# Minimum response length before a terminator is treated as end-of-message.
+# Models without IR routing send a single line, so their responses are shorter.
+ZONE_STATUS_SKIP = 20
+ZONE_STATUS_SKIP_NO_IR = 10
+ZONE_STATUS_SKIP_ASYNC = 15
 
 class ZoneStatus(object):
     def __init__(self,
@@ -32,13 +43,16 @@ class ZoneStatus(object):
     def from_string(cls, zone: int, string: str):
         if not string:
             return None
-        match_on = re.search (ZONE_PATTERN_ON, string)
-        if not match_on:
-            match_off = re.search (ZONE_PATTERN_OFF, string)
-            if not match_off:
-                return None
-            return ZoneStatus(zone,0,None,None)
-        return ZoneStatus(zone,1,*[int(m) for m in match_on.groups()])
+        match_on = re.search(ZONE_PATTERN_ON, string)
+        if match_on:
+            return ZoneStatus(zone, 1, *[int(m) for m in match_on.groups()])
+        # Models without IR routing report an AV source but no IR source.
+        match_on = re.search(ZONE_PATTERN_ON_NO_IR, string)
+        if match_on:
+            return ZoneStatus(zone, 1, int(match_on.group(1)), None)
+        if re.search(ZONE_PATTERN_OFF, string) or re.search(ZONE_PATTERN_OFF_NO_IR, string):
+            return ZoneStatus(zone, 0, None, None)
+        return None
 
 class LockStatus(object):
     def __init__(self,
@@ -119,9 +133,9 @@ def _format_zone_status_request(zone: int) -> bytes:
 def _format_set_zone_power(zone: int, power: bool) -> bytes:
     return '{}{}.\r'.format(zone, '@' if power else '$').encode()
 
-def _format_set_zone_source(zone: int, source: int) -> bytes:
+def _format_set_zone_source(zone: int, source: int, ir_control: bool = True) -> bytes:
     source = int(max(1, min(source,8)))
-    return '{}B{}.\r'.format(source, zone).encode()
+    return '{}{}{}.\r'.format(source, 'B' if ir_control else 'V', zone).encode()
 
 def _format_set_all_zone_source(source: int) -> bytes:
     source = int(max(1, min(source,8)))
@@ -137,10 +151,11 @@ def _format_lock_status() -> bytes:
     return '%9961.\r'.encode()
 
 
-def get_blackbird(url, use_serial=True):
+def get_blackbird(url, use_serial=True, ir_control=True):
     """
     Return synchronous version of Blackbird interface
     :param port_url: serial port, i.e. '/dev/ttyUSB0'
+    :param ir_control: False for models without IR routing, i.e. the 24180
     :return: synchronous implementation of Blackbird interface
     """
     lock = RLock()
@@ -229,7 +244,8 @@ def get_blackbird(url, use_serial=True):
         @synchronized
         def zone_status(self, zone: int):
             # Returns status of a zone
-            return ZoneStatus.from_string(zone, self._process_request(_format_zone_status_request(zone), skip=20))
+            skip = ZONE_STATUS_SKIP if ir_control else ZONE_STATUS_SKIP_NO_IR
+            return ZoneStatus.from_string(zone, self._process_request(_format_zone_status_request(zone), skip=skip))
 
         @synchronized
         def set_zone_power(self, zone: int, power: bool):
@@ -239,7 +255,7 @@ def get_blackbird(url, use_serial=True):
         @synchronized
         def set_zone_source(self, zone: int, source: int):
             # Set zone source
-            self._process_request(_format_set_zone_source(zone, source))
+            self._process_request(_format_set_zone_source(zone, source, ir_control))
 
         @synchronized
         def set_all_zone_source(self, source: int):
@@ -264,10 +280,11 @@ def get_blackbird(url, use_serial=True):
     return BlackbirdSync(url)
 
 
-async def get_async_blackbird(port_url, loop):
+async def get_async_blackbird(port_url, loop, ir_control=True):
     """
     Return asynchronous version of Blackbird interface
     :param port_url: serial port, i.e. '/dev/ttyUSB0'
+    :param ir_control: False for models without IR routing, i.e. the 24180
     :return: asynchronous implementation of Blackbird interface
     """
 
@@ -286,7 +303,8 @@ async def get_async_blackbird(port_url, loop):
 
         @locked_coro
         async def zone_status(self, zone: int):
-            string = await self._protocol.send(_format_zone_status_request(zone), skip=15)
+            skip = ZONE_STATUS_SKIP_ASYNC if ir_control else ZONE_STATUS_SKIP_NO_IR
+            string = await self._protocol.send(_format_zone_status_request(zone), skip=skip)
             return ZoneStatus.from_string(zone, string)
 
         @locked_coro
@@ -295,7 +313,7 @@ async def get_async_blackbird(port_url, loop):
 
         @locked_coro
         async def set_zone_source(self, zone: int, source: int):
-            await self._protocol.send(_format_set_zone_source(zone, source))
+            await self._protocol.send(_format_set_zone_source(zone, source, ir_control))
 
         @locked_coro
         async def set_all_zone_source(self, source: int):
