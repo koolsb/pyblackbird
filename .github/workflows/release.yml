@@ -72,7 +72,9 @@ jobs:
         test -f "dist/pyblackbird-${{ needs.check.outputs.version }}.tar.gz"
         test -f "dist/pyblackbird-${{ needs.check.outputs.version }}-py3-none-any.whl"
     - name: Publish to PyPI
-      uses: pypa/gh-action-pypi-publish@a892a5a61159132606e93a2fa6f4358831b04d26  # v1.14.2
+      # Docker action: the ref must be a commit SHA that has a matching
+      # ghcr.io image, not an annotated tag's object SHA.
+      uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2
       with:
         user: __token__
         password: ${{ secrets.PYPI_API_TOKEN }}
