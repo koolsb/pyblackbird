@@ -5,6 +5,13 @@ on:
     branches: [master]
   workflow_dispatch:
 
+# Releases must not overlap. Two merges landing close together would
+# otherwise both check for the tag before either has created it, and both
+# would decide to release the same version.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
