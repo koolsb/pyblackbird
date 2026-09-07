@@ -92,7 +92,8 @@ class TestAsyncBlackbird(TestBlackbird):
 
     def setUp(self):
         self.responses = {}
-        loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
+        self.addCleanup(loop.close)
         blackbird = loop.run_until_complete(get_async_blackbird(create_dummy_port(self.responses), loop))
 
         # Dummy blackbird that converts async to sync
