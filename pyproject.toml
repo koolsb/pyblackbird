@@ -1,6 +1,6 @@
 [project]
 name = "pyblackbird"
-version = "0.6"
+version = "0.7"
 authors = [
   { name = "Ben Kools", email="koolsb@my.uwstout.edu" },
 ]
