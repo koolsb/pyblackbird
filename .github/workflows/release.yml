@@ -56,6 +56,9 @@ jobs:
   release:
     needs: [check, test]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the tag and release
+      id-token: write   # mint the short-lived PyPI token via OIDC
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
@@ -71,13 +74,18 @@ jobs:
         ls dist/
         test -f "dist/pyblackbird-${{ needs.check.outputs.version }}.tar.gz"
         test -f "dist/pyblackbird-${{ needs.check.outputs.version }}-py3-none-any.whl"
+    # Authenticates via PyPI trusted publishing: GitHub's OIDC identity is
+    # exchanged for a short-lived token, so there is no API token to store.
+    # PyPI must have a publisher registered for koolsb/pyblackbird against
+    # this workflow filename.
     - name: Publish to PyPI
       # Docker action: the ref must be a commit SHA that has a matching
       # ghcr.io image, not an annotated tag's object SHA.
       uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2
       with:
-        user: __token__
-        password: ${{ secrets.PYPI_API_TOKEN }}
+        # The GitHub release is created after this step. If that ever fails,
+        # the retry must not die on files PyPI already has.
+        skip-existing: true
     - name: Create GitHub release
       env:
         GH_TOKEN: ${{ github.token }}
