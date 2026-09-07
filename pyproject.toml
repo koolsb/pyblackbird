@@ -6,10 +6,14 @@ authors = [
 ]
 description = "Python API for talking to Monoprice Blackbird 4k 8x8 HDBaseT Matrix"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Programming Language :: Python :: 3"
+]
+dependencies = [
+    "pyserial>=3.4",
+    "pyserial-asyncio-fast>=0.11",
 ]
 
 [project.urls]

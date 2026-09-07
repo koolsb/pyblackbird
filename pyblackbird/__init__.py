@@ -5,7 +5,7 @@ import re
 import serial
 import socket
 from functools import wraps
-from serial_asyncio import create_serial_connection
+from serial_asyncio_fast import create_serial_connection
 from threading import RLock
 
 _LOGGER = logging.getLogger(__name__)
