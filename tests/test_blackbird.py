@@ -88,6 +88,20 @@ class TestBlackbird(unittest.TestCase):
 
 
 
+class TestBlackbirdSocket(TestBlackbird):
+    """Run the same suite against the TCP transport instead of serial."""
+
+    def setUp(self):
+        self.responses = {}
+        self.blackbird = get_blackbird(
+            create_dummy_socket(self.responses), use_serial=False
+        )
+
+    def test_timeout(self):
+        with self.assertRaises(TimeoutError):
+            self.blackbird.set_zone_source(6, 6)
+
+
 class TestAsyncBlackbird(TestBlackbird):
 
     def setUp(self):
