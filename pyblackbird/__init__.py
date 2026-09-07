@@ -8,6 +8,8 @@ from functools import wraps
 from serialx import create_serial_connection
 from threading import RLock
 
+from .profiles import BLACKBIRD_8X8, BlackbirdProfile
+
 _LOGGER = logging.getLogger(__name__)
 ZONE_PATTERN_ON = re.compile(r'\D\D\D\s(\d\d)\D\D\d\d\s\s\D\D\D\s(\d\d)\D\D\d\d\s')
 ZONE_PATTERN_OFF = re.compile(r'\D\D\DOFF\D\D\d\d\s\s\D\D\D\D\D\D\D\D\d\d\s')
@@ -151,11 +153,18 @@ def _format_lock_status() -> bytes:
     return '%9961.\r'.encode()
 
 
-def get_blackbird(url, use_serial=True, ir_control=True):
+def get_blackbird(
+    url,
+    use_serial=True,
+    ir_control=True,
+    profile: BlackbirdProfile = BLACKBIRD_8X8,
+    port: int = PORT,
+):
     """
     Return synchronous version of Blackbird interface
     :param port_url: serial port, i.e. '/dev/ttyUSB0'
     :param ir_control: False for models without IR routing, i.e. the 24180
+    :param port: TCP port when ``use_serial`` is false
     :return: synchronous implementation of Blackbird interface
     """
     lock = RLock()
@@ -172,6 +181,7 @@ def get_blackbird(url, use_serial=True, ir_control=True):
             """
             Initialize the client.
             """
+            self.profile = profile
             if use_serial:
                 self._port = serialx.serial_for_url(
                     url,
@@ -186,7 +196,7 @@ def get_blackbird(url, use_serial=True, ir_control=True):
 
             else:
                 self.host = url
-                self.port = PORT
+                self.port = port
                 self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self.socket.settimeout(TIMEOUT)
                 self.socket.connect((self.host, self.port))
@@ -245,21 +255,29 @@ def get_blackbird(url, use_serial=True, ir_control=True):
         def zone_status(self, zone: int):
             # Returns status of a zone
             skip = ZONE_STATUS_SKIP if ir_control else ZONE_STATUS_SKIP_NO_IR
-            return ZoneStatus.from_string(zone, self._process_request(_format_zone_status_request(zone), skip=skip))
+            self.profile.validate_zone(zone)
+            return ZoneStatus.from_string(
+                zone,
+                self._process_request(_format_zone_status_request(zone), skip=skip),
+            )
 
         @synchronized
         def set_zone_power(self, zone: int, power: bool):
             # Set zone power
+            self.profile.validate_zone(zone)
             self._process_request(_format_set_zone_power(zone, power))
 
         @synchronized
         def set_zone_source(self, zone: int, source: int):
             # Set zone source
+            self.profile.validate_zone(zone)
+            self.profile.validate_source(source)
             self._process_request(_format_set_zone_source(zone, source, ir_control))
 
         @synchronized
         def set_all_zone_source(self, source: int):
             # Set all zones to one source
+            self.profile.validate_source(source)
             self._process_request(_format_set_all_zone_source(source))
 
         @synchronized
@@ -280,7 +298,12 @@ def get_blackbird(url, use_serial=True, ir_control=True):
     return BlackbirdSync(url)
 
 
-async def get_async_blackbird(port_url, loop, ir_control=True):
+async def get_async_blackbird(
+    port_url,
+    loop,
+    ir_control=True,
+    profile: BlackbirdProfile = BLACKBIRD_8X8,
+):
     """
     Return asynchronous version of Blackbird interface
     :param port_url: serial port, i.e. '/dev/ttyUSB0'
@@ -294,30 +317,36 @@ async def get_async_blackbird(port_url, loop, ir_control=True):
         @wraps(coro)
         async def wrapper(*args, **kwargs):
             async with lock:
-                return (await coro(*args, **kwargs))
+                return await coro(*args, **kwargs)
         return wrapper
 
     class BlackbirdAsync(Blackbird):
         def __init__(self, blackbird_protocol):
             self._protocol = blackbird_protocol
+            self.profile = profile
 
         @locked_coro
         async def zone_status(self, zone: int):
             skip = ZONE_STATUS_SKIP_ASYNC if ir_control else ZONE_STATUS_SKIP_NO_IR
             string = await self._protocol.send(_format_zone_status_request(zone), skip=skip)
+            self.profile.validate_zone(zone)
             return ZoneStatus.from_string(zone, string)
 
         @locked_coro
         async def set_zone_power(self, zone: int, power: bool):
+            self.profile.validate_zone(zone)
             await self._protocol.send(_format_set_zone_power(zone, power))
 
         @locked_coro
         async def set_zone_source(self, zone: int, source: int):
+            self.profile.validate_zone(zone)
+            self.profile.validate_source(source)
             await self._protocol.send(_format_set_zone_source(zone, source, ir_control))
 
         @locked_coro
         async def set_all_zone_source(self, source: int):
-             await self._protocol.send(_format_set_all_zone_source(source))
+            self.profile.validate_source(source)
+            await self._protocol.send(_format_set_all_zone_source(source))
 
         @locked_coro
         async def lock_front_buttons(self):
@@ -335,7 +364,6 @@ async def get_async_blackbird(port_url, loop, ir_control=True):
     class BlackbirdProtocol(asyncio.Protocol):
         def __init__(self, loop):
             super().__init__()
-            self._loop = loop
             self._lock = asyncio.Lock()
             self._transport = None
             self._connected = asyncio.Event()
@@ -347,7 +375,7 @@ async def get_async_blackbird(port_url, loop, ir_control=True):
             _LOGGER.debug('port opened %s', self._transport)
 
         def data_received(self, data):
-            asyncio.ensure_future(self.q.put(data), loop=self._loop)
+            self.q.put_nowait(data)
 
         async def send(self, request: bytes, skip=0):
             await self._connected.wait()

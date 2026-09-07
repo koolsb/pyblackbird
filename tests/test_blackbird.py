@@ -4,6 +4,7 @@ import serialx
 import socket
 
 from pyblackbird import (get_blackbird, get_async_blackbird, ZoneStatus)
+from pyblackbird.profiles import BLACKBIRD_4X4, BLACKBIRD_8X8
 from tests import (create_dummy_port, create_dummy_socket)
 import asyncio
 
@@ -66,10 +67,10 @@ class TestBlackbird(unittest.TestCase):
     def test_set_zone_source(self):
         self.responses[b'1B1.\r'] = b'AV:01->01\r'
         self.blackbird.set_zone_source(1,1)
-        self.responses[b'8B1.\r'] = b'AV:08->05\r'
-        self.blackbird.set_zone_source(1,100)
-        self.responses[b'1B1.\r'] = b'AV:01->01\r'
-        self.blackbird.set_zone_source(1,-100)
+        with self.assertRaises(ValueError):
+            self.blackbird.set_zone_source(1,100)
+        with self.assertRaises(ValueError):
+            self.blackbird.set_zone_source(1,-100)
         self.responses[b'2B2.\r'] = b'AV:02->02\r'
         self.blackbird.set_zone_source(2,2)
         self.assertEqual(0, len(self.responses))
@@ -102,6 +103,33 @@ class TestBlackbird(unittest.TestCase):
     def test_timeout(self):
         with self.assertRaises(serialx.SerialTimeoutException):
            self.blackbird.set_zone_source(6,6)
+
+
+class TestBlackbirdProfiles(unittest.TestCase):
+    """Test profile-specific protocol range validation."""
+
+    def setUp(self):
+        self.responses = {}
+
+    def test_4x4_profile_rejects_out_of_range_ids(self):
+        blackbird = get_blackbird(
+            create_dummy_port(self.responses), profile=BLACKBIRD_4X4
+        )
+
+        with self.assertRaises(ValueError):
+            blackbird.zone_status(5)
+        with self.assertRaises(ValueError):
+            blackbird.set_zone_source(1, 5)
+        with self.assertRaises(ValueError):
+            blackbird.set_all_zone_source(5)
+
+    def test_8x8_profile_accepts_maximum_ids(self):
+        blackbird = get_blackbird(
+            create_dummy_port(self.responses), profile=BLACKBIRD_8X8
+        )
+        self.responses[b'Status8.\r'] = b'AV: 08->08\r\nIR: 08->08\r'
+
+        assert blackbird.zone_status(8).zone == 8
 
 
 
