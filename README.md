@@ -1,5 +1,5 @@
 ## Status
-[![Build Status](https://travis-ci.org/koolsb/pyblackbird.svg?branch=master)](https://travis-ci.org/koolsb/pyblackbird)[![Coverage Status](https://coveralls.io/repos/github/koolsb/pyblackbird/badge.svg)](https://coveralls.io/github/koolsb/pyblackbird)
+[![Tests](https://github.com/koolsb/pyblackbird/actions/workflows/test.yml/badge.svg)](https://github.com/koolsb/pyblackbird/actions/workflows/test.yml)
 # pyblackbird
 Python3 interface implementation for Monoprice Blackbird 4k 8x8 HDBaseT Matrix
 
