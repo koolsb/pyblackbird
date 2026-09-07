@@ -9,8 +9,8 @@ from serial_asyncio_fast import create_serial_connection
 from threading import RLock
 
 _LOGGER = logging.getLogger(__name__)
-ZONE_PATTERN_ON = re.compile('\D\D\D\s(\d\d)\D\D\d\d\s\s\D\D\D\s(\d\d)\D\D\d\d\s')
-ZONE_PATTERN_OFF = re.compile('\D\D\DOFF\D\D\d\d\s\s\D\D\D\D\D\D\D\D\d\d\s')
+ZONE_PATTERN_ON = re.compile(r'\D\D\D\s(\d\d)\D\D\d\d\s\s\D\D\D\s(\d\d)\D\D\d\d\s')
+ZONE_PATTERN_OFF = re.compile(r'\D\D\DOFF\D\D\d\d\s\s\D\D\D\D\D\D\D\D\d\d\s')
 EOL = b'\r'
 LEN_EOL = len(EOL)
 TIMEOUT = 2 # Number of seconds before serial operation timeout
@@ -144,7 +144,6 @@ def get_blackbird(url, use_serial=True):
     :return: synchronous implementation of Blackbird interface
     """
     lock = RLock()
-    print(serial)
 
     def synchronized(func):
         @wraps(func)
@@ -275,7 +274,7 @@ async def get_async_blackbird(port_url, loop):
     def locked_coro(coro):
         @wraps(coro)
         async def wrapper(*args, **kwargs):
-            with (await lock):
+            async with lock:
                 return (await coro(*args, **kwargs))
         return wrapper
 
@@ -319,8 +318,8 @@ async def get_async_blackbird(port_url, loop):
             self._loop = loop
             self._lock = asyncio.Lock()
             self._transport = None
-            self._connected = asyncio.Event(loop=loop)
-            self.q = asyncio.Queue(loop=loop)
+            self._connected = asyncio.Event()
+            self.q = asyncio.Queue()
 
         def connection_made(self, transport):
             self._transport = transport
@@ -334,7 +333,7 @@ async def get_async_blackbird(port_url, loop):
             await self._connected.wait()
             result = bytearray()
             # Only one transaction at a time
-            with (await self._lock):
+            async with self._lock:
                 self._transport.serial.reset_output_buffer()
                 self._transport.serial.reset_input_buffer()
                 while not self.q.empty():
@@ -342,7 +341,7 @@ async def get_async_blackbird(port_url, loop):
                 self._transport.write(request)
                 try:
                     while True:
-                        result += await asyncio.wait_for(self.q.get(), TIMEOUT, loop=self._loop)
+                        result += await asyncio.wait_for(self.q.get(), TIMEOUT)
                         if len(result) > skip and result[-LEN_EOL:] == EOL:
                             ret = bytes(result)
                             _LOGGER.debug('Received "%s"', ret)
