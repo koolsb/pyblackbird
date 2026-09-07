@@ -1,19 +1,18 @@
 [project]
 name = "pyblackbird"
-version = "0.7"
+version = "0.8"
 authors = [
   { name = "Ben Kools", email="koolsb@my.uwstout.edu" },
 ]
 description = "Python API for talking to Monoprice Blackbird 4k 8x8 HDBaseT Matrix"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Programming Language :: Python :: 3"
 ]
 dependencies = [
-    "pyserial>=3.4",
-    "pyserial-asyncio-fast>=0.11",
+    "serialx>=1.10.0",
 ]
 
 [project.urls]

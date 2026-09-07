@@ -1,6 +1,6 @@
 import unittest
 
-import serial
+import serialx
 import socket
 
 from pyblackbird import (get_blackbird, get_async_blackbird, ZoneStatus)
@@ -84,7 +84,7 @@ class TestBlackbird(unittest.TestCase):
         self.assertEqual(0, len(self.responses))
 
     def test_timeout(self):
-        with self.assertRaises(serial.SerialTimeoutException):
+        with self.assertRaises(serialx.SerialTimeoutException):
            self.blackbird.set_zone_source(6,6)
 
 
