@@ -2,10 +2,10 @@ import asyncio
 import functools
 import logging
 import re
-import serial
+import serialx
 import socket
 from functools import wraps
-from serial_asyncio_fast import create_serial_connection
+from serialx import create_serial_connection
 from threading import RLock
 
 _LOGGER = logging.getLogger(__name__)
@@ -158,13 +158,15 @@ def get_blackbird(url, use_serial=True):
             Initialize the client.
             """
             if use_serial:
-                self._port = serial.serial_for_url(url, do_not_open=True)
-                self._port.baudrate = 9600
-                self._port.stopbits = serial.STOPBITS_ONE
-                self._port.bytesize = serial.EIGHTBITS
-                self._port.parity = serial.PARITY_NONE
-                self._port.timeout = TIMEOUT
-                self._port.write_timeout = TIMEOUT
+                self._port = serialx.serial_for_url(
+                    url,
+                    baudrate=9600,
+                    stopbits=serialx.STOPBITS_ONE,
+                    bytesize=serialx.EIGHTBITS,
+                    parity=serialx.PARITY_NONE,
+                    timeout=TIMEOUT,
+                    write_timeout=TIMEOUT,
+                )
                 self._port.open()
 
             else:
@@ -200,7 +202,7 @@ def get_blackbird(url, use_serial=True):
                     if c is None:
                         break
                     if not c:
-                        raise serial.SerialTimeoutException(
+                        raise serialx.SerialTimeoutException(
                             'Connection timed out! Last received bytes {}'.format([hex(a) for a in result]))
                     result += c
                     if len(result) > skip and result [-LEN_EOL:] == EOL:
